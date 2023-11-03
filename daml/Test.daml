@@ -1,0 +1,135 @@
+module Test where
+
+import Daml.Script
+import CropSales
+
+data SaleService = SaleService with
+    seller: Party
+    buyer : Party
+
+
+
+setSalesService : Text ->Text -> Script SaleService
+
+setSalesService  seller buyer = do
+    seller <- allocateParty seller
+    buyer <- allocateParty buyer
+    return SaleService with
+        seller = seller
+        buyer = buyer
+
+unhappPathTestingOne : Script ()
+unhappPathTestingOne = script do
+    salesService <- setSalesService  "Alice" "bob"
+    serviceCid <- submit salesService.seller do
+        createCmd SalesService with
+            seller = salesService.seller
+            buyerList = [salesService.buyer]
+    saleCid <- submitMustFail salesService.seller do
+        exerciseCmd serviceCid CreateSales
+            with
+                cropPrice = 0.0
+                readyFoSales = True
+                cropId = "1234"
+    
+    return()
+
+unhappPathTestingTwo = script do
+    salesService <- setSalesService  "Alice" "bob"
+    serviceCid <- submit salesService.seller do
+        createCmd SalesService with
+            seller = salesService.seller
+            buyerList = [salesService.buyer]
+    
+    saleCid <- submitMustFail salesService.buyer do
+        exerciseCmd serviceCid CreateSales
+            with
+                cropPrice = 100.0
+                readyFoSales = True
+                cropId = "1234"
+    
+    return()
+
+unhappPathTestingThree : Script ()
+unhappPathTestingThree = script do
+    salesService <- setSalesService  "Alice" "bob"
+    serviceCid <- submit salesService.seller do
+        createCmd SalesService with
+            seller = salesService.seller
+            buyerList = [salesService.buyer]
+    
+    saleCid <- submit salesService.seller do
+        exerciseCmd serviceCid CreateSales
+            with
+                cropPrice = 100.0
+                readyFoSales = False
+                cropId = "1234"
+    saleCid <- submitMustFail salesService.seller do
+        exerciseCmd serviceCid CreateSales
+            with
+                cropPrice = 100.0
+                readyFoSales = False
+                cropId = "1234"
+    return()
+happyPathTesting : Script ()
+happyPathTesting = script do
+    salesService <- setSalesService  "Alice" "bob"
+    serviceCid <- submit salesService.seller do
+        createCmd SalesService with
+            seller = salesService.seller
+            buyerList = [salesService.buyer]
+-- happy path testing one
+    submit salesService.seller do
+        exerciseCmd serviceCid CreateSales
+            with
+                cropPrice = 104.0
+                readyFoSales = False
+                cropId = "1234"
+    [(saleCid,saleData)] <- query @SellCrops salesService.seller
+    saleCid <- submit salesService.seller do
+        exerciseCmd saleCid SalesStatus
+            with
+                status = True
+
+-- happy path testing two
+    buyerCid <- submit salesService.buyer do
+        createCmd BuyCrops with
+            buyer = salesService.buyer
+            balanceAmount = 200.0
+            cropList = []
+            lastPurchasedFrom = None
+    (buyerCid) <- submit salesService.buyer do
+        exerciseCmd buyerCid PurchaseCrop
+            with
+               contractId = saleCid
+-- happy path testing three
+    
+    purchaseList <-submit salesService.buyer do
+        exerciseCmd buyerCid ShowCropList
+
+-- query to get List of Sale item , purchased item
+    debug("------------------------------------------")
+    debug("query to get List of Sale item")
+    salesList <- query @SellCrops salesService.seller
+    debug salesList
+    debug ("------------------------------------------------")
+    debug("query to get List of purchased item")
+    purchasedList <- query @BuyCrops salesService.buyer
+    debug purchasedList
+    debug("------------------------------------------------")
+    debug("get purchased Details of the buyer")
+    let purchaseCrop = map(\(_,y) -> y) purchasedList
+    debug (purchaseCrop)
+
+    debug("-------------------------------------------------")
+    debug("get crops which price is greater than 100")
+    highestprice <- queryFilter 
+        @SellCrops 
+        salesService.seller
+        \crops -> (crops.cropPrice > 100.00)
+    debug highestprice
+    return ()
+
+
+
+    

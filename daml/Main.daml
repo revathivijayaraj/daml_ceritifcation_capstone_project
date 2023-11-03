@@ -1,0 +1,71 @@
+module Main where
+
+import Daml.Script
+import DA.List
+import CropSales
+
+
+data SaleService = SaleService with
+    seller: Party
+    buyer : [Party]
+
+
+setSalesService : Script SaleService
+
+setSalesService  = do
+    seller <- allocatePartyWithHint "Seller1" (PartyIdHint "Seller")
+
+    buyer1 <- allocatePartyWithHint "Buyer1" (PartyIdHint "Buyer1")
+    buyer2 <- allocatePartyWithHint "Buyer2" (PartyIdHint "Buyer2")
+    buyer3 <- allocatePartyWithHint "Buyer3" (PartyIdHint "Buyer3")
+    
+    return SaleService with
+        seller = seller
+        buyer = [buyer1,buyer2,buyer3]
+
+
+setup : Script ()
+setup = script do
+  salesService <- setSalesService
+    
+  seller <- validateUserId "Seller"
+  
+  buyer1 <- validateUserId "Buyer1"
+  buyer2 <- validateUserId "Buyer2"
+  buyer3 <- validateUserId "Buyer3"
+
+  
+  createUser (User seller (Some (salesService.seller))) [CanActAs (salesService.seller)]
+
+  createUser (User buyer1 (Some (head salesService.buyer))) [CanActAs (head salesService.buyer)]
+  createUser (User buyer2 (Some (salesService.buyer !! 1))) [CanActAs (salesService.buyer !! 1)]
+  createUser (User buyer3 (Some (salesService.buyer !! 2))) [CanActAs (salesService.buyer !! 2)]
+
+  submit salesService.seller do
+    createCmd SalesService with
+        seller = salesService.seller
+        buyerList = salesService.buyer
+
+
+  submit (head salesService.buyer) do
+    createCmd BuyCrops with
+        buyer = (head salesService.buyer)
+        balanceAmount = 0.0
+        cropList = []
+        lastPurchasedFrom = None
+
+  submit (last salesService.buyer) do
+    createCmd BuyCrops with
+        buyer = (last salesService.buyer)
+        balanceAmount = 0.0
+        cropList = []
+        lastPurchasedFrom = None
+
+  submit (salesService.buyer !! 1) do
+    createCmd BuyCrops with
+        buyer = (salesService.buyer !! 1)
+        balanceAmount = 0.0
+        cropList = []
+        lastPurchasedFrom = None
+
+  return()

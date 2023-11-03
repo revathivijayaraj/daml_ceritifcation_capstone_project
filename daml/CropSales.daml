@@ -1,0 +1,128 @@
+module CropSales where
+
+import DA.Optional
+import DA.Text
+
+
+data CropDetails = CropDetails with
+    sellerId: Party
+    cropId: Text
+    cropPrice: Decimal
+        deriving (Show, Eq, Ord)
+
+data Barcode = Barcode with
+    barValue: Text
+
+class CropUniqueId i o where
+    uniqueId : i -> o
+
+instance CropUniqueId Barcode Text where
+    uniqueId barcode = sha256 barcode.barValue
+
+template SalesService 
+    with
+        seller: Party
+        buyerList:[Party]
+    where
+        signatory seller
+
+        choice CreateSales: Optional (ContractId SellCrops)
+            with
+                cropId:Text
+                cropPrice: Decimal
+                readyFoSales: Bool
+            controller seller
+                do
+                    checkSalesAlreadyCreated <- lookupByKey @SellCrops(seller,uniqueId(Barcode cropId))
+                    if(isNone checkSalesAlreadyCreated) then
+                        do
+                            saleCid <- create SellCrops with
+                                seller = seller
+                                cropId = uniqueId(Barcode cropId)
+                                cropPrice = cropPrice
+                                readyFoSales = readyFoSales
+                                buyerList = buyerList
+                            return $ Some saleCid
+                    else 
+                        return None
+
+        
+
+template SellCrops
+  with
+    seller: Party
+    cropId: Text
+    cropPrice: Decimal
+    readyFoSales: Bool
+    buyerList: [Party]
+  where
+    signatory seller
+    observer buyerList
+
+    key(seller, cropId) : (Party, Text)
+    maintainer key._1
+
+    ensure cropPrice /= 0.0
+
+
+    choice SalesStatus: ContractId SellCrops
+        with
+            status:Bool
+        controller seller
+            do
+                create this with
+                    readyFoSales = status
+    
+    choice UpdateCropPrice:ContractId SellCrops
+        with
+            newAmount: Decimal
+        controller seller
+            do
+                create this with
+                    cropPrice = newAmount
+                
+
+
+
+template BuyCrops
+  with
+    buyer : Party
+    cropList: [CropDetails]
+    balanceAmount: Decimal
+    lastPurchasedFrom: Optional Party
+
+  where
+    signatory buyer
+
+    choice PurchaseCrop: ContractId BuyCrops
+        with
+           contractId: ContractId SellCrops
+        controller buyer
+            do
+                sellerData <- fetch @SellCrops contractId
+                assertMsg "Crop is not ready for sales" (sellerData.readyFoSales)
+                assertMsg "You dont have enough balance to purchase" (balanceAmount > sellerData.cropPrice)
+                let  croptDetails = CropDetails with
+                        sellerId = sellerData.seller
+                        cropId = sellerData.cropId
+                        cropPrice = sellerData.cropPrice
+                create this with
+                    cropList = croptDetails :: cropList
+                    balanceAmount = balanceAmount - sellerData.cropPrice
+                    lastPurchasedFrom = Some (sellerData.seller)
+
+    choice DepositeAmount : ContractId BuyCrops
+        with
+            addBalance: Decimal
+        controller buyer
+            do
+                create this with
+                    balanceAmount = balanceAmount + addBalance
+
+    
+                        
+    nonconsuming choice ShowCropList : [CropDetails]
+        controller buyer
+            do
+                return cropList
+
