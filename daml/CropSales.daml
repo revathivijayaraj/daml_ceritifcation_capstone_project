@@ -33,6 +33,7 @@ template SalesService
                 readyFoSales: Bool
             controller seller
                 do
+                --allow to create only if the sale is not created
                     checkSalesAlreadyCreated <- lookupByKey @SellCrops(seller,uniqueId(Barcode cropId))
                     if(isNone checkSalesAlreadyCreated) then
                         do
@@ -70,6 +71,7 @@ template SellCrops
             status:Bool
         controller seller
             do
+            --update sale status
                 create this with
                     readyFoSales = status
     
@@ -78,6 +80,7 @@ template SellCrops
             newAmount: Decimal
         controller seller
             do
+            -- chage the crop sale price
                 create this with
                     cropPrice = newAmount
                 
@@ -99,6 +102,7 @@ template BuyCrops
            contractId: ContractId SellCrops
         controller buyer
             do
+            --purchase the crop
                 sellerData <- fetch @SellCrops contractId
                 assertMsg "Crop is not ready for sales" (sellerData.readyFoSales)
                 assertMsg "You dont have enough balance to purchase" (balanceAmount > sellerData.cropPrice)
@@ -116,6 +120,7 @@ template BuyCrops
             addBalance: Decimal
         controller buyer
             do
+            --deposite the amount to purchase the crop
                 create this with
                     balanceAmount = balanceAmount + addBalance
 
@@ -124,5 +129,6 @@ template BuyCrops
     nonconsuming choice ShowCropList : [CropDetails]
         controller buyer
             do
+            -- list out the purchased crops
                 return cropList
 

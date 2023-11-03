@@ -34,19 +34,20 @@ setup = script do
   buyer2 <- validateUserId "Buyer2"
   buyer3 <- validateUserId "Buyer3"
 
-  
+  -- create user for seller and buyer
   createUser (User seller (Some (salesService.seller))) [CanActAs (salesService.seller)]
 
   createUser (User buyer1 (Some (head salesService.buyer))) [CanActAs (head salesService.buyer)]
   createUser (User buyer2 (Some (salesService.buyer !! 1))) [CanActAs (salesService.buyer !! 1)]
   createUser (User buyer3 (Some (salesService.buyer !! 2))) [CanActAs (salesService.buyer !! 2)]
 
+-- create account for seller
   submit salesService.seller do
     createCmd SalesService with
         seller = salesService.seller
         buyerList = salesService.buyer
 
-
+-- create account for buyers
   submit (head salesService.buyer) do
     createCmd BuyCrops with
         buyer = (head salesService.buyer)

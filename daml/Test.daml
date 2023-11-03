@@ -17,7 +17,7 @@ setSalesService  seller buyer = do
     return SaleService with
         seller = seller
         buyer = buyer
-
+-- unhappy testing 1 -> create sales with price amount 0
 unhappPathTestingOne : Script ()
 unhappPathTestingOne = script do
     salesService <- setSalesService  "Alice" "bob"
@@ -33,7 +33,7 @@ unhappPathTestingOne = script do
                 cropId = "1234"
     
     return()
-
+-- unhappy path testing 2 -> create sales using controller buyer
 unhappPathTestingTwo = script do
     salesService <- setSalesService  "Alice" "bob"
     serviceCid <- submit salesService.seller do
@@ -50,6 +50,7 @@ unhappPathTestingTwo = script do
     
     return()
 
+-- unhappy path testing 3 -> create duplicate sales.
 unhappPathTestingThree : Script ()
 unhappPathTestingThree = script do
     salesService <- setSalesService  "Alice" "bob"
@@ -78,7 +79,7 @@ happyPathTesting = script do
         createCmd SalesService with
             seller = salesService.seller
             buyerList = [salesService.buyer]
--- happy path testing one
+-- happy path testing one -> creates sales by providing correct details
     submit salesService.seller do
         exerciseCmd serviceCid CreateSales
             with
@@ -91,7 +92,7 @@ happyPathTesting = script do
             with
                 status = True
 
--- happy path testing two
+-- happy path testing two -> create buyer account and buy the crop from sale
     buyerCid <- submit salesService.buyer do
         createCmd BuyCrops with
             buyer = salesService.buyer
@@ -102,7 +103,7 @@ happyPathTesting = script do
         exerciseCmd buyerCid PurchaseCrop
             with
                contractId = saleCid
--- happy path testing three
+-- happy path testing three -> list out the purchased crop details
     
     purchaseList <-submit salesService.buyer do
         exerciseCmd buyerCid ShowCropList
